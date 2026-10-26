@@ -1,0 +1,29 @@
+# Задача 8.2 · один из вариантов исправления.
+# Порт 8080 и /actuator/health условные, их нужно уточнить у разработчиков.
+
+# для запуска хватает JRE, JDK не нужен
+FROM bellsoft/liberica-openjre-alpine:21
+
+LABEL maintainer=qa-team
+
+# пакеты обновляем до копирования jar, чтобы этот слой брался из кеша
+# и заводим непривилегированного пользователя
+RUN apk upgrade --no-cache \
+    && addgroup -S app \
+    && adduser -S app -G app
+
+WORKDIR /app
+
+# конфиги меняются реже jar, поэтому копируются раньше.
+# Spring Boot сам читает ./config/ относительно рабочей папки
+COPY application.yml logback.xml config/
+COPY pcr-mock-app.jar app.jar
+
+USER app
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+CMD ["java", "-jar", "app.jar"]
